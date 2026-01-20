@@ -1,4 +1,8 @@
+import type { SampleType } from "./types";
+
 export class Equipment {
-    id: string;
-    name: string;
-}
+    constructor(public id: string,
+        public type: SampleType,
+        public available: boolean) { }
+
+} 

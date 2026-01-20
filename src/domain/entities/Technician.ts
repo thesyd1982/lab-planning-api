@@ -1,10 +1,24 @@
-import type { Speciality } from "./types";
+import { Speciality } from "./Speciality";
 
 export class Technician {
+    id: string;
+    speciality: Speciality;
+    startTime: string;
+    endTime: string;
+    name?: string;
+
     constructor(
-        public id: string,
-        public name: string,
-        public speciality: Speciality,
-        public startTime: string,
-        public endTime: string) { }
+        id: string,
+        speciality: Speciality,
+        startTime: string,
+        endTime: string,
+        name?: string) {
+
+        this.id = id;
+        this.speciality = speciality;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.name = name
+
+    }
 }

@@ -1,9 +1,11 @@
-import type { Priority, SampleType } from "./types";
+import { Priority } from "./Priority";
+import { SampleType } from "./SampleType";
+
 
 export class Sample {
     constructor(
         public id: string,
-        public type: SampleType,
+        public sampleType: SampleType,
         public priority: Priority,
         public analysisTime: number,
         public arrivalTime: string,

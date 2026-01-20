@@ -1,4 +1,4 @@
-import type { Priority } from "./types",
+import Priority from "./Priority"
 
 export class ScheduleEntry {
     constructor(public sampleId: string,
