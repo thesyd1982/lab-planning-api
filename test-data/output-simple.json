@@ -1,0 +1,17 @@
+{
+  "schedule": [
+    {
+      "sampleId": "S001",
+      "technicianId": "T001",
+      "equipmentId": "E001",
+      "startTime": "09:00",
+      "endTime": "09:30",
+      "priority": "URGENT"
+    }
+  ],
+  "metrics": {
+    "totalTime": 30,
+    "efficiency": 100.0,
+    "conflicts": 0
+  }
+}
