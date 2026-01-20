@@ -1,6 +1,6 @@
 import type { Priority, SampleType } from "./types";
 
-export class Sapmle {
+export class Sample {
     constructor(
         public id: string,
         public type: SampleType,
