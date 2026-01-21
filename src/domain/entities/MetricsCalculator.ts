@@ -10,11 +10,20 @@ export class MetricsCalculator {
         return TimeCalculator.convertToMinutes(last.endTime) - TimeCalculator.convertToMinutes(first.startTime)
     }
 
-    static calculateEffeciency(schedule: ScheduleEntry[]): number {
-        // % = (somme durées analyses) / (temps total planning) * 100
-        if (schedule.length < 2) return 100
-        const totoalAnalysisTime = schedule.reduce((acc, e) => acc + TimeCalculator.duration(e.startTime, e.endTime), 0)
-        return (totoalAnalysisTime / MetricsCalculator.calculateTotalTime(schedule)) * 100
+    static calculateEfficiency(schedule: ScheduleEntry[]): number {
+        if (schedule.length === 0) return 0;  //  Cas vide
+        if (schedule.length === 1) return 100;  //  Un seul élément = 100%
+
+        const totalAnalysisTime = schedule.reduce((acc, e) =>
+            acc + TimeCalculator.duration(e.startTime, e.endTime), 0
+        );
+
+        const totalPlanningTime = MetricsCalculator.calculateTotalTime(schedule);
+
+        //  Protection contre division par zéro
+        if (totalPlanningTime === 0) return 0;
+
+        return (totalAnalysisTime / totalPlanningTime) * 100;
     }
 
     static countConflicts(schedule: ScheduleEntry[]): number { return 0 }

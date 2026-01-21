@@ -1,152 +1,126 @@
+// Main - Point d'entrée du système de planification de laboratoire
+// Architecture Clean avec séparation des responsabilités
+
 import {
     Sample, Technician, Equipment, Priority,
     SampleType, Speciality, ScheduleEntry, LabSchedule,
     Metrics, TimeCalculator, MetricsCalculator,
-    ResourceManager
+    ResourceManager, AvailabilityChecker
 } from "./domain/entities";
 
 import {
-    // inputSimple, 
-    // outputSimple,
-    // inputPriority,
-    // outputPriority
-    inputResources as data
-
+    inputResources as data,
+    outputResouces
 } from "../test-data";
-import { AvailabilityChecker } from "./domain/entities/AvailabilityChecker";
-
-//console.log(inputSimple);
-//console.log(outputSimple);
 
 
-const samples: Sample[] = data.samples.map(e => {
+// Transformation des données d'entrée en entités domain
+const samples: Sample[] = data.samples.map(e => new Sample(
+    e.id,
+    SampleType.fromString(e.type),
+    Priority.fromString(e.priority),
+    e.analysisTime,
+    e.arrivalTime,
+    e.patientId
+));
 
-    return new Sample(
-        e.id,
-        SampleType.fromString(e.type),
-        Priority.fromString(e.priority), // a revoir
-        e.analysisTime,
-        e.arrivalTime,
-        e.patientId
-    )
-}
-);
+const technicians: Technician[] = data.technicians.map(t => new Technician(
+    t.id,
+    Speciality.fromString(t.speciality),
+    t.startTime,
+    t.endTime
+));
 
+const equipments: Equipment[] = data.equipment.map(e => new Equipment(
+    e.id,
+    SampleType.fromString(e.type),
+    e.available
+));
 
+// ===== FONCTIONS UTILITAIRES =====
 
-const technicians: Technician[] = data.technicians.map((t) => {
-    return new Technician(t.id, Speciality.fromString(t.speciality), t.startTime, t.endTime)
-}
-);
-
-
-
-const equipments = data.equipment.map((e) => {
-    return new Equipment(
-        e.id,
-        SampleType.fromString(e.type),
-        e.available
-    )
-})
-
-function sortedByPriority(samples: Sample[]) {
+function sortedByPriority(samples: Sample[]): Sample[] {
     return samples.sort((a, b) => a.priority.compareTo(b.priority))
 }
 
-
-function sortedByArrivalTime(samples: Sample[]) {
+function sortedByArrivalTime(samples: Sample[]): Sample[] {
     return samples.sort((a, b) => TimeCalculator.convertToMinutes(a.arrivalTime) - TimeCalculator.convertToMinutes(b.arrivalTime))
 }
 
-
-
-
-function sortSamples(samples: Sample[]) {
+function sortSamples(samples: Sample[]): Sample[] {
     return sortedByPriority(sortedByArrivalTime(samples))
 }
-// calcule le endTime  = startTime + analysisTime 
-// defois startTime = arrivalTime sinon  startTime = schedule[i-1].endTime 
-// donc il faut ajouter row by row to the schedule
 
-// choisir tech
+// ===== ALGORITHME PRINCIPAL =====
 
-
-
-
-// fonction pour calculer la premiere heure de depart d'une analyse
-//
-function calculateStartTime(tech: Technician, equipment: Equipment, schedule: ScheduleEntry[], sample: Sample): string {
-    const techAvailable = AvailabilityChecker.techniciansAvailableAt(schedule, tech);
-    const equipAvailable = AvailabilityChecker.equipmentAvailableAt(schedule, equipment);
-    const sampleArrival = sample.arrivalTime;
-
-    const maxAvailability = Math.max(
-        TimeCalculator.convertToMinutes(techAvailable),
-        TimeCalculator.convertToMinutes(equipAvailable),
-        TimeCalculator.convertToMinutes(sampleArrival)
-    );
-
-    return TimeCalculator.minutesToHours(maxAvailability);
-}
-
+/**
+ * Crée le planning des analyses de laboratoire
+ * Algorithme : tri par priorité puis allocation séquentielle avec parallélisme opportuniste
+ */
 function schedules(samples: Sample[], technicians: Technician[], equipments: Equipment[]): ScheduleEntry[] {
     const schedule: ScheduleEntry[] = []
-    const ss = sortSamples(samples)
+    const sortedSamples = sortSamples(samples)
 
+    for (const sample of sortedSamples) {
+        // Sélection des ressources disponibles
+        const selectedTechnician = ResourceManager.selectTech(technicians, schedule, sample)
+        const selectedEquipment = ResourceManager.selectEquipment(equipments, sample)
 
+        // Calcul du créneau optimal
+        const startTime = AvailabilityChecker.calculateStartTime(
+            selectedTechnician,
+            selectedEquipment,
+            schedule,
+            sample
+        );
+        const endTime = TimeCalculator.minutesToHours(
+            TimeCalculator.convertToMinutes(startTime) + sample.analysisTime
+        )
 
-    let i = 0;
-    for (let sample of ss) {
-
-        const techniciansAvailable = ResourceManager.selectTech(technicians, schedule, sample)
-        const equipmentAvailable = ResourceManager.selectEquipment(equipments, sample)
-
-        const technicianId = techniciansAvailable.id;
-        const equipmentId = equipmentAvailable.id;
-
-        const previous = (i > 0) ? schedule[i - 1] : null
-
-        const priority = sample.priority.toString();
-
-        const startTime = previous ? previous.endTime : sample.arrivalTime
-
-        const endTime = TimeCalculator.minutesToHours(TimeCalculator.convertToMinutes(startTime) + sample.analysisTime)
-
-        const se: ScheduleEntry = new ScheduleEntry(sample.id,
-            technicianId,
-            equipmentId,
+        // Création de l'entrée de planning
+        const scheduleEntry = new ScheduleEntry(
+            sample.id,
+            selectedTechnician.id,
+            selectedEquipment.id,
             startTime,
             endTime,
-            priority)
+            sample.priority.toString()
+        )
 
-        schedule.push(se)
-        i++
+        schedule.push(scheduleEntry)
     }
+
     return schedule
 }
 
-function planifyLab(data: { samples: Sample[], technicians: Technician[], equipments: Equipment[] }) {
+/**
+ * Fonction principale de planification de laboratoire
+ */
+function planifyLab(data: { samples: Sample[], technicians: Technician[], equipments: Equipment[] }): LabSchedule {
     const { samples, technicians, equipments } = data
+
+    // Génération du planning
     const schedule = schedules(samples, technicians, equipments)
-    const metrics = new Metrics(MetricsCalculator.calculateTotalTime(schedule),
-        MetricsCalculator.calculateEffeciency(schedule),
-        MetricsCalculator.countConflicts(schedule))
+
+    // Calcul des métriques
+    const metrics = new Metrics(
+        MetricsCalculator.calculateTotalTime(schedule),
+        MetricsCalculator.calculateEfficiency(schedule),
+        MetricsCalculator.countConflicts(schedule)
+    )
 
     return new LabSchedule(schedule, metrics)
 }
 
-//console.log(convertToMinutes("12:00"))
-//console.log(duration("12:00", "12:30"))
+// ===== EXÉCUTION ET TESTS =====
 
-//console.log(sortedByArrivalTime(samples).map(e => ({ id: e.id, arrivalTime: e.arrivalTime, priority: e.priority.value })))
-//console.log(sortedByPriority(samples).map(e => ({ id: e.id, arrivalTime: e.arrivalTime, priority: e.priority.value })))
+// Exécution avec données de test
+const result = planifyLab({ samples, technicians, equipments })
 
-//console.log(".".repeat(15))
-//console.log({ schedule })
-planifyLab({ samples, technicians, equipments }).printScheduale()
-// console.log(schedules(samples, technicians, equipments).
-//     map(e => ({ startTime: e.startTime, endTime: e.endTime, priority: e.priority })))
-//console.log("isAvailable", isAvailable(schedule, technicians[0], "16:59", 1))
-console.log(ResourceManager.sortTechsBySpecialty(technicians))
-//console.log(schedule)
+// Affichage des résultats
+console.log("=== PLANNING GÉNÉRÉ ===")
+result.printScheduale()
+
+console.log("\n=== RÉSULTAT ATTENDU ===")
+console.log(outputResouces)
 

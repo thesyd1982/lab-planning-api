@@ -44,4 +44,17 @@ export class AvailabilityChecker {
         return TimeCalculator.minutesToHours(lastEndTime);
     }
 
+    static calculateStartTime(tech: Technician, equipment: Equipment, schedule: ScheduleEntry[], sample: Sample): string {
+        const techAvailable = AvailabilityChecker.techniciansAvailableAt(schedule, tech);
+        const equipAvailable = AvailabilityChecker.equipmentAvailableAt(schedule, equipment);
+        const sampleArrival = sample.arrivalTime;
+
+        const maxAvailability = Math.max(
+            TimeCalculator.convertToMinutes(techAvailable),
+            TimeCalculator.convertToMinutes(equipAvailable),
+            TimeCalculator.convertToMinutes(sampleArrival)
+        );
+
+        return TimeCalculator.minutesToHours(maxAvailability);
+    }
 }
