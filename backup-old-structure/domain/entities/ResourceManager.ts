@@ -31,7 +31,7 @@ export class ResourceManager {
 
     static techniciansAvailable(technicians: Technician[], schedule: ScheduleEntry[], sample: Sample) {
 
-        return technicians.filter(t => AvailabilityChecker.isAvailable(schedule, t, AvailabilityChecker.techniciansAvailableAt(schedule, t), sample.analysisTime))
+        return technicians.filter(t => AvailabilityChecker.isTechAvailable(schedule, t, AvailabilityChecker.techniciansAvailableAt(schedule, t), sample.analysisTime))
     }
 
     static sortTechsBySpecialty(technicians: Technician[]) {

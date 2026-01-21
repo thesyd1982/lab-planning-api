@@ -1,11 +1,11 @@
-import type { Equipment } from "./Equipment"
-import type { Sample } from "./Sample"
-import type { ScheduleEntry } from "./ScheduleEntry"
-import type { Technician } from "./Technician"
+import type { Equipment } from "../entities/Equipment"
+import type { Sample } from "../entities/Sample"
+import type { ScheduleEntry } from "../entities/ScheduleEntry"
+import type { Technician } from "../entities/Technician"
 import { TimeCalculator } from "./TimeCalculator"
 
-export class AvailabilityChecker {
-    // Fonction pour savoir si un technicien est disponible a un temps donner et une duree 
+export class TimeManager {
+    // Fonction pour savoir si un technicien est disponible a un temps donné et une duree 
     // selon le calendrier
     static isAvailable(schedule: ScheduleEntry[], tech: Technician, time: string, duration: number): boolean {
         const endTime = TimeCalculator.minutesToHours(TimeCalculator.convertToMinutes(time) + duration)
@@ -14,7 +14,7 @@ export class AvailabilityChecker {
         // calendrier non vide et hors de plage de travail
         if (!tech.isWorkingAt(endTime) || !tech.isWorkingAt(time)) return false
 
-        const nextAvailableTime = AvailabilityChecker.techniciansAvailableAt(schedule, tech)
+        const nextAvailableTime = TimeManager.techniciansAvailableAt(schedule, tech)
         const isFree = (TimeCalculator.convertToMinutes(endTime) >= TimeCalculator.convertToMinutes(nextAvailableTime))
         return isFree
     }
@@ -45,8 +45,8 @@ export class AvailabilityChecker {
     }
 
     static calculateStartTime(tech: Technician, equipment: Equipment, schedule: ScheduleEntry[], sample: Sample): string {
-        const techAvailable = AvailabilityChecker.techniciansAvailableAt(schedule, tech);
-        const equipAvailable = AvailabilityChecker.equipmentAvailableAt(schedule, equipment);
+        const techAvailable = TimeManager.techniciansAvailableAt(schedule, tech);
+        const equipAvailable = TimeManager.equipmentAvailableAt(schedule, equipment);
         const sampleArrival = sample.arrivalTime;
 
         const maxAvailability = Math.max(

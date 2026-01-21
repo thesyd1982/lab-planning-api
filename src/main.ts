@@ -1,20 +1,8 @@
-// Main - Point d'entrée du système de planification de laboratoire
-// Architecture Clean avec séparation des responsabilités
+import { Sample, Technician, Equipment, Priority, SampleType, Speciality } from "./entities";
+import { Scheduler } from "./planning";
+import { inputResources as data, outputResouces } from "../test-data";
 
-import {
-    Sample, Technician, Equipment, Priority,
-    SampleType, Speciality, ScheduleEntry, LabSchedule,
-    Metrics, TimeCalculator, MetricsCalculator,
-    ResourceManager, AvailabilityChecker
-} from "./domain/entities";
-
-import {
-    inputResources as data,
-    outputResouces
-} from "../test-data";
-
-
-// Transformation des données d'entrée en entités domain
+// Transformation des données d'entrée en entités
 const samples: Sample[] = data.samples.map(e => new Sample(
     e.id,
     SampleType.fromString(e.type),
@@ -37,90 +25,15 @@ const equipments: Equipment[] = data.equipment.map(e => new Equipment(
     e.available
 ));
 
-// ===== FONCTIONS UTILITAIRES =====
+// ===== UTILISATION DU NOUVEAU SCHEDULER =====
 
-function sortedByPriority(samples: Sample[]): Sample[] {
-    return samples.sort((a, b) => a.priority.compareTo(b.priority))
-}
+const scheduler = new Scheduler();
+const result = scheduler.planify({ samples, technicians, equipments });
 
-function sortedByArrivalTime(samples: Sample[]): Sample[] {
-    return samples.sort((a, b) => TimeCalculator.convertToMinutes(a.arrivalTime) - TimeCalculator.convertToMinutes(b.arrivalTime))
-}
+// ===== AFFICHAGE DES RÉSULTATS =====
 
-function sortSamples(samples: Sample[]): Sample[] {
-    return sortedByPriority(sortedByArrivalTime(samples))
-}
+console.log("=== PLANNING GÉNÉRÉ ===");
+result.printScheduale();
 
-// ===== ALGORITHME PRINCIPAL =====
-
-/**
- * Crée le planning des analyses de laboratoire
- * Algorithme : tri par priorité puis allocation séquentielle avec parallélisme opportuniste
- */
-function schedules(samples: Sample[], technicians: Technician[], equipments: Equipment[]): ScheduleEntry[] {
-    const schedule: ScheduleEntry[] = []
-    const sortedSamples = sortSamples(samples)
-
-    for (const sample of sortedSamples) {
-        // Sélection des ressources disponibles
-        const selectedTechnician = ResourceManager.selectTech(technicians, schedule, sample)
-        const selectedEquipment = ResourceManager.selectEquipment(equipments, sample)
-
-        // Calcul du créneau optimal
-        const startTime = AvailabilityChecker.calculateStartTime(
-            selectedTechnician,
-            selectedEquipment,
-            schedule,
-            sample
-        );
-        const endTime = TimeCalculator.minutesToHours(
-            TimeCalculator.convertToMinutes(startTime) + sample.analysisTime
-        )
-
-        // Création de l'entrée de planning
-        const scheduleEntry = new ScheduleEntry(
-            sample.id,
-            selectedTechnician.id,
-            selectedEquipment.id,
-            startTime,
-            endTime,
-            sample.priority.toString()
-        )
-
-        schedule.push(scheduleEntry)
-    }
-
-    return schedule
-}
-
-/**
- * Fonction principale de planification de laboratoire
- */
-function planifyLab(data: { samples: Sample[], technicians: Technician[], equipments: Equipment[] }): LabSchedule {
-    const { samples, technicians, equipments } = data
-
-    // Génération du planning
-    const schedule = schedules(samples, technicians, equipments)
-
-    // Calcul des métriques
-    const metrics = new Metrics(
-        MetricsCalculator.calculateTotalTime(schedule),
-        MetricsCalculator.calculateEfficiency(schedule),
-        MetricsCalculator.countConflicts(schedule)
-    )
-
-    return new LabSchedule(schedule, metrics)
-}
-
-// ===== EXÉCUTION ET TESTS =====
-
-// Exécution avec données de test
-const result = planifyLab({ samples, technicians, equipments })
-
-// Affichage des résultats
-console.log("=== PLANNING GÉNÉRÉ ===")
-result.printScheduale()
-
-console.log("\n=== RÉSULTAT ATTENDU ===")
-console.log(outputResouces)
-
+console.log("\n=== RÉSULTAT ATTENDU ===");
+console.log(outputResouces);
