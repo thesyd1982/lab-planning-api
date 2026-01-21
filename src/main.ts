@@ -61,7 +61,7 @@ function qualifiedTechnicians(technicians: Technician[], sampleType: SampleType)
 
 function techniciansAvailable(technicians: Technician[], schedule: ScheduleEntry[], sample: Sample) {
 
-    return technicians.filter(t => isAvailable(schedule, t, availableAt(schedule, t), sample.analysisTime))
+    return technicians.filter(t => isAvailable(schedule, t, techniciansAvailableAt(schedule, t), sample.analysisTime))
 }
 
 
@@ -82,25 +82,48 @@ function selectTech(technicians: Technician[], schedule: ScheduleEntry[], sample
     const qualifiedtechs = qualifiedTechnicians(technicians, sample.sampleType)
     // trier par specialité 
     const sortedTechs = sortTechsBySpecialty(qualifiedtechs)
+
     if (schedule.length == 0) {
         return sortedTechs[0]
     }
-
     const availableTechs = techniciansAvailable(sortedTechs, schedule, sample)
 
-    return availableTechs[0]
+    if (availableTechs.length > 0) return availableTechs[0]
+    if (sortedTechs.length > 0) return sortedTechs[0]
+
+    throw new Error("Aucun technicien disponible pour le sample " + sample.sampleType)
 }
+
 function compatible(equipment: Equipment, sample: Sample) {
     return equipment.type.equals(sample.sampleType)
 }
 // choisir equipment
 function selectEquipment(equipments: Equipment[], sample: Sample) {
     const availableEquipments = equipments.filter(e => e.available && compatible(e, sample))
-    return availableEquipments[0]
+    if (availableEquipments.length > 0) return availableEquipments[0]
+    const compatibles = equipments.filter(e => compatible(e, sample))
+    if (compatibles.length > 0) return compatibles[0]
+    throw new Error("Aucun appareil compatible pour le sample " + sample.sampleType)
+}
+
+function equipmentAvailableAt(schedule: ScheduleEntry[], equipment: Equipment): string {
+    // Filtrer toutes les analyses qui utilisent cet équipement
+    const equipmentSchedule = schedule.filter(entry => entry.equipmentId === equipment.id);
+
+    // Si aucune analyse programmée sur cet équipement
+    if (equipmentSchedule.length === 0) {
+        return "00:00"; // Disponible immédiatement (ou heure d'ouverture du lab)
+    }
+
+    // Trouver la fin de la dernière analyse sur cet équipement
+    const endTimes = equipmentSchedule.map(entry => TimeCalculator.convertToMinutes(entry.endTime));
+    const lastEndTime = Math.max(...endTimes);
+
+    return TimeCalculator.minutesToHours(lastEndTime);
 }
 
 // fonction qui donne l'heur a la quelle un tech devient dispo
-function availableAt(schedule: ScheduleEntry[], tech: Technician): string {
+function techniciansAvailableAt(schedule: ScheduleEntry[], tech: Technician): string {
 
     const s = schedule.filter(filter => filter.technicianId == tech.id)
     if (s.length == 0) return tech.startTime
@@ -118,9 +141,24 @@ function isAvailable(schedule: ScheduleEntry[], tech: Technician, time: string, 
     // calendrier non vide et hors de plage de travail
     if (!tech.isWorkingAt(endTime) || !tech.isWorkingAt(time)) return false
 
-    const nextAvailableTime = availableAt(schedule, tech)
+    const nextAvailableTime = techniciansAvailableAt(schedule, tech)
     const isFree = (TimeCalculator.convertToMinutes(endTime) >= TimeCalculator.convertToMinutes(nextAvailableTime))
     return isFree
+}
+// fonction pour calculer la premiere heure de depart d'une analyse
+//
+function calculateStartTime(tech: Technician, equipment: Equipment, schedule: ScheduleEntry[], sample: Sample): string {
+    const techAvailable = techniciansAvailableAt(schedule, tech);
+    const equipAvailable = equipmentAvailableAt(schedule, equipment);
+    const sampleArrival = sample.arrivalTime;
+
+    const maxAvailability = Math.max(
+        TimeCalculator.convertToMinutes(techAvailable),
+        TimeCalculator.convertToMinutes(equipAvailable),
+        TimeCalculator.convertToMinutes(sampleArrival)
+    );
+
+    return TimeCalculator.minutesToHours(maxAvailability);
 }
 
 function schedules(samples: Sample[], technicians: Technician[], equipments: Equipment[]): ScheduleEntry[] {
@@ -132,14 +170,18 @@ function schedules(samples: Sample[], technicians: Technician[], equipments: Equ
     let i = 0;
     for (let sample of ss) {
 
-        const technicianId = selectTech(technicians, schedule, sample).id;
-        const equipmentId = selectEquipment(equipments, sample).id;
+        const techniciansAvailable = selectTech(technicians, schedule, sample)
+        const equipmentAvailable = selectEquipment(equipments, sample)
+
+        const technicianId = techniciansAvailable.id;
+        const equipmentId = equipmentAvailable.id;
 
         const previous = (i > 0) ? schedule[i - 1] : null
 
         const priority = sample.priority.toString();
 
         const startTime = previous ? previous.endTime : sample.arrivalTime
+
         const endTime = TimeCalculator.minutesToHours(TimeCalculator.convertToMinutes(startTime) + sample.analysisTime)
 
         const se: ScheduleEntry = new ScheduleEntry(sample.id,
