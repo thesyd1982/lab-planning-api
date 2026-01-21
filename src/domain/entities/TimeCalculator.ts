@@ -24,4 +24,8 @@ export class TimeCalculator {
         return (TimeCalculator.convertToMinutes(end)) - (TimeCalculator.convertToMinutes(start))
     }
 
+    static add(start: string, duration: number): number {
+
+        return TimeCalculator.convertToMinutes(start) + duration
+    }
 }
