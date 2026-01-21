@@ -1,11 +1,11 @@
 import type { SampleType } from "./SampleType";
 
 export class Speciality {
-    private constructor(public readonly value: string) { }
-    static readonly BLOOD = new Speciality('BLOOD');
-    static readonly URINE = new Speciality('URINE');
-    static readonly TISSUE = new Speciality('TISSUE');
-    static readonly GENERAL = new Speciality('GENERAL');
+    private constructor(public readonly value: string, public order: number) { }
+    static readonly BLOOD = new Speciality('BLOOD', 0);
+    static readonly URINE = new Speciality('URINE', 0);
+    static readonly TISSUE = new Speciality('TISSUE', 0);
+    static readonly GENERAL = new Speciality('GENERAL', 1);
 
     private static readonly values = [
         Speciality.BLOOD,
@@ -28,6 +28,10 @@ export class Speciality {
 
     canHandle(sampleType: SampleType): boolean {
         return this.value === 'GENERAL' || this.value === sampleType.value;
+    }
+
+    compareTo(other: Speciality): number {
+        return this.order - other.order;
     }
 
     static getAll(): Speciality[] {

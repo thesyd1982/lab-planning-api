@@ -1,5 +1,3 @@
-import { Priority } from "./Priority"
-
 export class ScheduleEntry {
     constructor(public sampleId: string,
         public technicianId: string,

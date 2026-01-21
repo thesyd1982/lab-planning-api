@@ -1,4 +1,5 @@
 import { Speciality } from "./Speciality";
+import { TimeCalculator } from "./TimeCalculator";
 
 export class Technician {
     id: string;
@@ -21,4 +22,9 @@ export class Technician {
         this.name = name
 
     }
+
+    isWorkingAt = (time: string) => {
+        return TimeCalculator.convertToMinutes(this.startTime) <= TimeCalculator.convertToMinutes(time) && TimeCalculator.convertToMinutes(this.endTime) >= TimeCalculator.convertToMinutes(time)
+    }
+
 }

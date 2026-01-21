@@ -1,4 +1,4 @@
-import { Sample, Technician, Equipment, Priority, SampleType, Speciality, ScheduleEntry, LabSchedule, Metrics } from "./domain/entities";
+import { Sample, Technician, Equipment, Priority, SampleType, Speciality, ScheduleEntry, LabSchedule, Metrics, TimeCalculator } from "./domain/entities";
 
 import {
     // inputSimple, 
@@ -8,13 +8,9 @@ import {
     inputResources as data
 
 } from "../test-data";
-import { start } from "node:repl";
 
 //console.log(inputSimple);
 //console.log(outputSimple);
-
-const scheduler: LabSchedule = new LabSchedule([], new Metrics(0, 0, 0))
-
 
 
 const samples: Sample[] = data.samples.map(e => {
@@ -53,7 +49,7 @@ function sortedByPriority(samples: Sample[]) {
 
 
 function sortedByArrivalTime(samples: Sample[]) {
-    return samples.sort((a, b) => convetToMinutes(a.arrivalTime) - convetToMinutes(b.arrivalTime))
+    return samples.sort((a, b) => TimeCalculator.convertToMinutes(a.arrivalTime) - TimeCalculator.convertToMinutes(b.arrivalTime))
 }
 
 
@@ -63,74 +59,10 @@ function qualifiedTechnicians(technicians: Technician[], sampleType: SampleType)
     return technicians.filter(t => t.speciality.canHandle(sampleType))
 }
 
-function techniciansAvailable(technicians: any[], sample: any) {
+function techniciansAvailable(technicians: Technician[], schedule: ScheduleEntry[], sample: Sample) {
 
-    return technicians.filter(t => t.available)
+    return technicians.filter(t => isAvailable(schedule, t, availableAt(schedule, t), sample.analysisTime))
 }
-
-
-
-
-function convetToMinutes(time: string) {
-    let result = -1
-    try {
-        const [hour, minutes] = time.split(':')
-        const h = parseInt(hour)
-        const m = parseInt(minutes)
-        result = h * 60 + m
-    }
-
-    catch (err) {
-        console.log("time is not in the correct format")
-    }
-
-    return result
-
-}
-function minutesToHours(time: number) {
-    const hours = Math.floor(time / 60)
-    const minutes = time % 60
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-}
-
-
-
-function duration(start: string, end: string) {
-    const startTime = convetToMinutes(start)
-    if (startTime == -1) return -1
-
-    const endTime = convetToMinutes(end)
-    if (endTime == -1) return -1
-
-    return endTime - startTime
-}
-
-// sort by priority
-// sort by arrivals time
-// calcules la startTime et endTime
-// push dans le schedule
-
-
-// calcule le endTime  = startTime + analysisTime 
-// defois startTime = arrivalTime sinon  startTime = schedule[i-1].endTime 
-// donc il faut ajouter row by row to the schedule
-
-const result = sortedByPriority(samples).map(s => {
-
-    const techs = qualifiedTechnicians(technicians, s.sampleType)
-    const t = techs[0]
-
-    return (
-        {
-            sampleId: s.id,
-            technicianId: t.id,
-            equipmentId: s.id,
-            startTime: s.arrivalTime,//heur de commencement
-            endTime: s.id,
-            priority: s.priority.value
-        }
-    )
-})
 
 
 function sortSamples(samples: Sample[]) {
@@ -139,12 +71,24 @@ function sortSamples(samples: Sample[]) {
 // calcule le endTime  = startTime + analysisTime 
 // defois startTime = arrivalTime sinon  startTime = schedule[i-1].endTime 
 // donc il faut ajouter row by row to the schedule
+function sortTechsBySpecialty(technicians: Technician[]) {
+    return technicians.sort((a, b) => a.speciality.compareTo(b.speciality))
 
+}
 
 // choisir tech
-function selectTech(technicians: Technician[], sample: Sample) {
+function selectTech(technicians: Technician[], schedule: ScheduleEntry[], sample: Sample) {
+
     const qualifiedtechs = qualifiedTechnicians(technicians, sample.sampleType)
-    return qualifiedtechs[0]
+    // trier par specialité 
+    const sortedTechs = sortTechsBySpecialty(qualifiedtechs)
+    if (schedule.length == 0) {
+        return sortedTechs[0]
+    }
+
+    const availableTechs = techniciansAvailable(sortedTechs, schedule, sample)
+
+    return availableTechs[0]
 }
 function compatible(equipment: Equipment, sample: Sample) {
     return equipment.type.equals(sample.sampleType)
@@ -155,25 +99,48 @@ function selectEquipment(equipments: Equipment[], sample: Sample) {
     return availableEquipments[0]
 }
 
+// fonction qui donne l'heur a la quelle un tech devient dispo
+function availableAt(schedule: ScheduleEntry[], tech: Technician): string {
+
+    const s = schedule.filter(filter => filter.technicianId == tech.id)
+    if (s.length == 0) return tech.startTime
+    const endtimes = s.map(e => TimeCalculator.convertToMinutes(e.endTime))
+    const max = Math.max(...endtimes)
+    return TimeCalculator.minutesToHours(max)
+}
+
+// Fonction pour savoir si un technicien est disponible a un temps donner et une duree 
+// selon le calendrier
+function isAvailable(schedule: ScheduleEntry[], tech: Technician, time: string, duration: number): boolean {
+    const endTime = TimeCalculator.minutesToHours(TimeCalculator.convertToMinutes(time) + duration)
+    // calendrier vide on verfie la plage de travail
+    if (schedule.length == 0) return tech.isWorkingAt(time) && tech.isWorkingAt(endTime)
+    // calendrier non vide et hors de plage de travail
+    if (!tech.isWorkingAt(endTime) || !tech.isWorkingAt(time)) return false
+
+    const nextAvailableTime = availableAt(schedule, tech)
+    const isFree = (TimeCalculator.convertToMinutes(endTime) >= TimeCalculator.convertToMinutes(nextAvailableTime))
+    return isFree
+}
 
 function schedules(samples: Sample[], technicians: Technician[], equipments: Equipment[]): ScheduleEntry[] {
     const schedule: ScheduleEntry[] = []
     const ss = sortSamples(samples)
 
 
+
     let i = 0;
     for (let sample of ss) {
 
-        const technicianId = selectTech(technicians, sample).id;
+        const technicianId = selectTech(technicians, schedule, sample).id;
         const equipmentId = selectEquipment(equipments, sample).id;
-
 
         const previous = (i > 0) ? schedule[i - 1] : null
 
         const priority = sample.priority.toString();
 
         const startTime = previous ? previous.endTime : sample.arrivalTime
-        const endTime = minutesToHours(convetToMinutes(startTime) + sample.analysisTime)
+        const endTime = TimeCalculator.minutesToHours(TimeCalculator.convertToMinutes(startTime) + sample.analysisTime)
 
         const se: ScheduleEntry = new ScheduleEntry(sample.id,
             technicianId,
@@ -182,15 +149,38 @@ function schedules(samples: Sample[], technicians: Technician[], equipments: Equ
             endTime,
             priority)
 
-        console.log(previous?.startTime, previous?.endTime, se.startTime, se.endTime)
         schedule.push(se)
         i++
     }
     return schedule
 }
+// Metrics
+
+function calculateTotalTime(schedule: ScheduleEntry[]): number {
+    if (schedule.length == 0) return 0
+    if (schedule.length == 1) return TimeCalculator.duration(schedule[0].startTime, schedule[0].endTime)
+    const [first, , last] = schedule
+    return TimeCalculator.convertToMinutes(last.endTime) - TimeCalculator.convertToMinutes(first.startTime)
+}
+
+function calculateEffeciency(schedule: ScheduleEntry[]): number {
+    // % = (somme durées analyses) / (temps total planning) * 100
+    if (schedule.length < 2) return 100
+    const totoalAnalysisTime = schedule.reduce((acc, e) => acc + TimeCalculator.duration(e.startTime, e.endTime), 0)
+    return (totoalAnalysisTime / calculateTotalTime(schedule)) * 100
+}
 
 
-//console.log(convetToMinutes("12:00"))
+function countConflicts(schedule: ScheduleEntry[]): number { return 0 }
+
+function planifyLab(data: { samples: Sample[], technicians: Technician[], equipments: Equipment[] }) {
+    const { samples, technicians, equipments } = data
+    const schedule = schedules(samples, technicians, equipments)
+    const metrics = new Metrics(calculateTotalTime(schedule), calculateEffeciency(schedule), countConflicts(schedule))
+    return new LabSchedule(schedule, metrics)
+}
+
+//console.log(convertToMinutes("12:00"))
 //console.log(duration("12:00", "12:30"))
 
 //console.log(sortedByArrivalTime(samples).map(e => ({ id: e.id, arrivalTime: e.arrivalTime, priority: e.priority.value })))
@@ -198,7 +188,10 @@ function schedules(samples: Sample[], technicians: Technician[], equipments: Equ
 
 //console.log(".".repeat(15))
 //console.log({ schedule })
-
-console.log(schedules(samples, technicians, equipments).
-    map(e => ({ startTime: e.startTime, endTime: e.endTime, priority: e.priority })))
+const { schedule, _ } = planifyLab({ samples, technicians, equipments })
+// console.log(schedules(samples, technicians, equipments).
+//     map(e => ({ startTime: e.startTime, endTime: e.endTime, priority: e.priority })))
+//console.log("isAvailable", isAvailable(schedule, technicians[0], "16:59", 1))
+console.log(sortTechsBySpecialty(technicians))
+//console.log(schedule)
 

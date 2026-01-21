@@ -4,4 +4,5 @@ export class Metrics {
         public efficiency: number,     // (75min d'analyses) / (105min total)
         public conflicts: number       // 0
     ) { }
+
 }

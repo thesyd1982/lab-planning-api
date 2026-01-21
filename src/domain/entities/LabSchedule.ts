@@ -5,4 +5,8 @@ export class LabSchedule {
     constructor(
         public schedule: ScheduleEntry[],
         public metrics: Metrics) { }
+
+    printScheduale = () => {
+        console.log(this.schedule, this.metrics)
+    }
 }
