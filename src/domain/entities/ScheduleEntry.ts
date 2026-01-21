@@ -1,4 +1,4 @@
-import Priority from "./Priority"
+import { Priority } from "./Priority"
 
 export class ScheduleEntry {
     constructor(public sampleId: string,
@@ -6,5 +6,5 @@ export class ScheduleEntry {
         public equipmentId: string,
         public startTime: string,
         public endTime: string,
-        public priority: Priority) { }
+        public priority: string) { }
 }

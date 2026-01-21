@@ -1,0 +1,33 @@
+{
+  "schedule": [
+    {
+      "sampleId": "S001",
+      "technicianId": "T001",
+      "equipmentId": "E001",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "priority": "URGENT"
+    },
+    {
+      "sampleId": "S002",
+      "technicianId": "T002",
+      "equipmentId": "E002",
+      "startTime": "09:15",
+      "endTime": "09:45",
+      "priority": "URGENT"
+    },
+    {
+      "sampleId": "S003",
+      "technicianId": "T001",
+      "equipmentId": "E001",
+      "startTime": "10:00",
+      "endTime": "10:45",
+      "priority": "ROUTINE"
+    }
+  ],
+  "metrics": {
+    "totalTime": 105,
+    "efficiency": 78.6,
+    "conflicts": 0
+  }
+}

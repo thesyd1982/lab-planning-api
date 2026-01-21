@@ -1,4 +1,4 @@
-import type { SampleType } from "./types";
+import type { SampleType } from "./SampleType";
 
 export class Equipment {
     constructor(public id: string,
